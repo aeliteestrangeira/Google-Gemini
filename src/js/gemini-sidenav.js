@@ -2,6 +2,7 @@
   "use strict";
 
   var collapsedTemplate = "";
+  var initialChatContentTemplate = "";
   var CLOSE_ICON_DEFAULT = "side_nav";
   var CLOSE_ICON_HOVER = "side_nav_collapse";
   var NOTEBOOKS_ICON_EXPANDED = "keyboard_arrow_down";
@@ -24,6 +25,21 @@
   var EDIT_MEMORY_DIALOG_WRAPPER_ID = "gemini-edit-memory-dialog-overlay";
   var EDIT_MEMORY_DIALOG_STYLE_ID = "gemini-edit-memory-dialog-style";
   var EDIT_MEMORY_DIALOG_EXTRACTED_STYLES_ID = "gemini-edit-memory-dialog-extracted-styles";
+  var EDIT_MEMORY_SUBMIT_LOADING_DURATION = 1000;
+  var EDIT_MEMORY_INPUT_MIN_HEIGHT = 24;
+  var SAVED_INFO_STORAGE_KEY = "gemini-local-saved-info-memories";
+  var SAVED_INFO_MEMORY_ENABLED_STORAGE_KEY = "gemini-local-saved-info-memory-enabled";
+  var MEMORY_TEXT_DISPLAY_LIMIT = 82;
+  var MEMORY_TEXT_TRUNCATED_SUFFIX = "...";
+  var MEMORY_ACTIONS_MENU_WRAPPER_ID = "gemini-memory-actions-menu-overlay";
+  var MEMORY_ACTIONS_MENU_STYLE_ID = "gemini-memory-actions-menu-style";
+  var MEMORY_ACTIONS_MENU_PANEL_ID = "mat-menu-panel-13";
+  var DELETE_MEMORY_DIALOG_WRAPPER_ID = "gemini-delete-memory-dialog-overlay";
+  var DELETE_MEMORY_DIALOG_STYLE_ID = "gemini-delete-memory-dialog-style";
+  var DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID = "gemini-delete-all-memories-dialog-overlay";
+  var SAVED_INFO_SNACKBAR_WRAPPER_ID = "gemini-saved-info-snackbar-overlay";
+  var SAVED_INFO_SNACKBAR_STYLE_ID = "gemini-saved-info-snackbar-style";
+  var SAVED_INFO_SNACKBAR_DURATION = 3000;
 
   function getSideNavContainer() {
     return document.querySelector("bard-sidenav-container[data-test-id='bard-sidenav-container'], bard-sidenav-container");
@@ -41,6 +57,14 @@
 
     if (!collapsedTemplate && container) {
       collapsedTemplate = container.outerHTML;
+    }
+  }
+
+  function rememberInitialChatContentTemplate() {
+    var content = document.querySelector("bard-sidenav-content");
+
+    if (!initialChatContentTemplate && content && !content.querySelector("personal-intelligence-page, saved-info-page")) {
+      initialChatContentTemplate = content.outerHTML;
     }
   }
 
@@ -142,18 +166,746 @@
       : null;
   }
 
+  function getNewChatButton(target) {
+    return target && target.closest
+      ? target.closest("bard-sidenav gem-nav-list-item[data-test-id='new-chat-button'] a, bard-sidenav gem-nav-list-item[data-test-id='new-chat-button'] button, bard-sidenav gem-nav-list-item[data-test-id='new-chat-button']")
+      : null;
+  }
+
   function getSavedInfoAddButton(target) {
     return target && target.closest
       ? target.closest("saved-info-page button.create-memory-button")
       : null;
   }
 
+  function getDeleteAllMemoriesButton(target) {
+    return target && target.closest
+      ? target.closest("saved-info-page button.delete-all-memories-button")
+      : null;
+  }
+
+  function getMemoryActionsButton(target) {
+    return target && target.closest
+      ? target.closest("saved-info-page button.memory-actions-button")
+      : null;
+  }
+
+  function getMemoryActionDeleteButton(target) {
+    return target && target.closest
+      ? target.closest("#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " button.delete-button[data-test-id='delete-button']")
+      : null;
+  }
+
+  function getMemoryActionEditButton(target) {
+    return target && target.closest
+      ? target.closest("#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " button.edit-button[data-test-id='edit-button']")
+      : null;
+  }
+
+  function getDeleteMemoryDialogWrapper() {
+    return document.getElementById(DELETE_MEMORY_DIALOG_WRAPPER_ID);
+  }
+
+  function getDeleteAllMemoriesDialogWrapper() {
+    return document.getElementById(DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID);
+  }
+
+  function getDeleteMemoryCancelButton(target) {
+    return target && target.closest
+      ? target.closest("#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button[data-test-id='cancel-button'] button")
+      : null;
+  }
+
+  function getDeleteMemoryConfirmButton(target) {
+    return target && target.closest
+      ? target.closest("#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button[data-test-id='confirm-button'] button")
+      : null;
+  }
+
+  function getDeleteAllMemoriesCancelButton(target) {
+    var button = target && target.closest
+      ? target.closest("#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button")
+      : null;
+
+    return button && button.textContent.indexOf("Cancelar") !== -1 ? button : null;
+  }
+
+  function getDeleteAllMemoriesConfirmButton(target) {
+    var button = target && target.closest
+      ? target.closest("#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button")
+      : null;
+
+    return button && button.textContent.indexOf("Excluir tudo") !== -1 ? button : null;
+  }
+
+  function getSavedInfoSnackbarWrapper() {
+    return document.getElementById(SAVED_INFO_SNACKBAR_WRAPPER_ID);
+  }
+
   function getEditMemoryDialogWrapper() {
     return document.getElementById(EDIT_MEMORY_DIALOG_WRAPPER_ID);
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getSavedMemories() {
+    var parsed;
+
+    try {
+      parsed = JSON.parse(window.localStorage.getItem(SAVED_INFO_STORAGE_KEY) || "[]");
+    } catch (error) {
+      parsed = [];
+    }
+
+    return Array.isArray(parsed)
+      ? parsed.filter(function (memory) {
+        return typeof memory === "string" && memory.trim().length > 0;
+      })
+      : [];
+  }
+
+  function setSavedMemories(memories) {
+    window.localStorage.setItem(SAVED_INFO_STORAGE_KEY, JSON.stringify(memories));
+  }
+
+  function addSavedMemory(memory) {
+    var text = String(memory || "").trim();
+    var memories;
+
+    if (!text) {
+      return;
+    }
+
+    memories = getSavedMemories();
+    memories.push(text);
+    setSavedMemories(memories);
+  }
+
+  function getMemoryDisplayText(memory) {
+    var text = String(memory || "").trim();
+
+    if (text.length <= MEMORY_TEXT_DISPLAY_LIMIT) {
+      return text;
+    }
+
+    return text.slice(0, MEMORY_TEXT_DISPLAY_LIMIT).trimEnd() + MEMORY_TEXT_TRUNCATED_SUFFIX;
+  }
+
+  function deleteSavedMemory(index) {
+    var memories = getSavedMemories();
+
+    if (index < 0 || index >= memories.length) {
+      return;
+    }
+
+    memories.splice(index, 1);
+    setSavedMemories(memories);
+  }
+
+  function updateSavedMemory(index, memory) {
+    var text = String(memory || "").trim();
+    var memories = getSavedMemories();
+
+    if (!text || index < 0 || index >= memories.length) {
+      return;
+    }
+
+    memories[index] = text;
+    setSavedMemories(memories);
+  }
+
+  function ensureSavedInfoSnackbarStyle() {
+    var style;
+
+    if (document.getElementById(SAVED_INFO_SNACKBAR_STYLE_ID)) {
+      return;
+    }
+
+    style = document.createElement("style");
+    style.id = SAVED_INFO_SNACKBAR_STYLE_ID;
+    style.textContent = [
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " {",
+      "  position: fixed;",
+      "  inset: 0;",
+      "  z-index: 1600;",
+      "  pointer-events: none;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .cdk-overlay-container {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .cdk-global-overlay-wrapper {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  display: flex;",
+      "  pointer-events: none;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .cdk-overlay-pane {",
+      "  pointer-events: auto;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .mat-mdc-snack-bar-container {",
+      "  display: flex;",
+      "  align-items: center;",
+      "  justify-content: center;",
+      "  box-sizing: border-box;",
+      "  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);",
+      "  margin: 8px;",
+      "  --mat-snack-bar-container-shape: var(--gem-sys-shape--corner-large);",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .mdc-snackbar__surface {",
+      "  box-shadow: 0px 3px 5px -1px rgba(0, 0, 0, 0.2), 0px 6px 10px 0px rgba(0, 0, 0, 0.14), 0px 1px 18px 0px rgba(0, 0, 0, 0.12);",
+      "  display: flex;",
+      "  align-items: center;",
+      "  justify-content: flex-start;",
+      "  box-sizing: border-box;",
+      "  padding-left: 0;",
+      "  padding-right: var(--gem-sys-spacing--m, 16px);",
+      "  min-width: 344px;",
+      "  max-width: 672px;",
+      "  color: var(--mat-snack-bar-supporting-text-color, var(--mat-sys-inverse-on-surface, #fff));",
+      "  border-radius: var(--mat-snack-bar-container-shape, var(--gem-sys-shape--corner-large, 16px));",
+      "  background-color: var(--mat-snack-bar-container-color, var(--mat-sys-inverse-surface, #202124));",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .delete-all-snackbar .mdc-snackbar__surface {",
+      "  width: 376px;",
+      "  min-width: 376px;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .container {",
+      "  display: flex;",
+      "  align-items: center;",
+      "  justify-content: space-between;",
+      "  min-height: 3.75rem;",
+      "}",
+      "#" + SAVED_INFO_SNACKBAR_WRAPPER_ID + " .label {",
+      "  width: 100%;",
+      "  flex-grow: 1;",
+      "  box-sizing: border-box;",
+      "  margin: 0;",
+      "  color: var(--lumi-sys-color--surface, #fff);",
+      "  padding: var(--gem-sys-spacing--m, 16px) var(--gem-sys-spacing--xs, 4px) var(--gem-sys-spacing--m, 16px) var(--gem-sys-spacing--xxl, 32px);",
+      "  font-family: Google Sans Flex, Google Sans, Helvetica Neue, sans-serif;",
+      "  font-size: var(--gem-sys-typography-type-scale--body-m-font-size, 14px);",
+      "  font-weight: var(--gem-sys-typography-type-scale--body-m-font-weight, 400);",
+      "  letter-spacing: var(--gem-sys-typography-type-scale--body-m-font-tracking, 0);",
+      "  line-height: var(--gem-sys-typography-type-scale--body-m-line-height, 20px);",
+      "  font-variation-settings: var(--gds-type-scale-default-wdth), var(--gds-type-scale-default-slnt), var(--gds-type-scale-default-rond);",
+      "  white-space: nowrap;",
+      "  overflow: hidden;",
+      "  text-overflow: ellipsis;",
+      "  max-width: 520px;",
+      "}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function getSavedInfoSnackbarTemplate(message, variant) {
+    var variantClass = variant ? " " + variant : "";
+
+    return [
+      "<div class=\"cdk-overlay-container\">",
+      "<div class=\"cdk-global-overlay-wrapper\" dir=\"ltr\" style=\"justify-content: flex-start; align-items: flex-end;\">",
+      "<div id=\"cdk-overlay-1\" class=\"cdk-overlay-pane\" style=\"position: static; margin-left: 0px; margin-bottom: 0px;\">",
+      "<mat-snack-bar-container class=\"mdc-snackbar mat-mdc-snack-bar-container custom-snackbar lm-enabled mat-snack-bar-container-enter",
+      variantClass,
+      "\">",
+      "<div class=\"mdc-snackbar__surface mat-mdc-snackbar-surface\"><div class=\"mat-mdc-snack-bar-label\"><div aria-live=\"off\" id=\"mat-snack-bar-container-live-0\"><div>",
+      "<bard-simple-snack-bar _nghost-ng-c2690432418=\"\" class=\"lm-enabled ng-star-inserted\"><div _ngcontent-ng-c2690432418=\"\" class=\"container\">",
+      "<div _ngcontent-ng-c2690432418=\"\" matsnackbarlabel=\"\" data-test-id=\"label\" class=\"mat-mdc-snack-bar-label mdc-snackbar__label label\">",
+      escapeHtml(message),
+      "</div>",
+      "<!----></div></bard-simple-snack-bar><!----></div></div></div></div></mat-snack-bar-container></div></div></div>"
+    ].join("");
+  }
+
+  function closeSavedInfoSnackbar() {
+    var wrapper = getSavedInfoSnackbarWrapper();
+
+    if (wrapper) {
+      window.clearTimeout(wrapper.geminiSavedInfoSnackbarTimer);
+      wrapper.remove();
+    }
+  }
+
+  function showSavedInfoSnackbar(message, variant) {
+    var wrapper;
+
+    ensureSavedInfoSnackbarStyle();
+    closeSavedInfoSnackbar();
+
+    wrapper = document.createElement("div");
+    wrapper.id = SAVED_INFO_SNACKBAR_WRAPPER_ID;
+    wrapper.innerHTML = getSavedInfoSnackbarTemplate(message || "Informa\u00e7\u00f5es salvas", variant || "");
+    document.body.appendChild(wrapper);
+    wrapper.geminiSavedInfoSnackbarTimer = window.setTimeout(closeSavedInfoSnackbar, SAVED_INFO_SNACKBAR_DURATION);
+  }
+
   function getEditMemoryDialogTemplate() {
     return "<div class=\"cdk-overlay-container\"><div class=\"cdk-overlay-backdrop cdk-overlay-backdrop-noop-animation cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing\"></div><div class=\"cdk-global-overlay-wrapper\" dir=\"ltr\" style=\"justify-content: center; align-items: center;\"><div id=\"cdk-overlay-5\" class=\"cdk-overlay-pane mat-mdc-dialog-panel\" style=\"width: calc(-48px + 100vw); max-width: 600px; position: static;\"><div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div><mat-dialog-container tabindex=\"-1\" class=\"mat-mdc-dialog-container mdc-dialog cdk-dialog-container mdc-dialog--open _mat-animation-noopable mat-mdc-dialog-container-with-actions\" id=\"mat-mdc-dialog-0\" role=\"dialog\" aria-modal=\"false\" aria-labelledby=\"mat-mdc-dialog-title-0\"><div class=\"mat-mdc-dialog-inner-container mdc-dialog__container\"><div class=\"mat-mdc-dialog-surface mdc-dialog__surface\"><edit-memory-dialog _nghost-ng-c4208921684=\"\" class=\"mat-mdc-dialog-component-host ng-star-inserted\"><h1 _ngcontent-ng-c4208921684=\"\" mat-dialog-title=\"\" class=\"mat-mdc-dialog-title mdc-dialog__title gds-title-l\" id=\"mat-mdc-dialog-title-0\">O que você quer que o Gemini memorize?</h1><mat-dialog-content _ngcontent-ng-c4208921684=\"\" class=\"mat-mdc-dialog-content mdc-dialog__content\"><mat-form-field _ngcontent-ng-c4208921684=\"\" appearance=\"outline\" subscriptsizing=\"dynamic\" class=\"mat-mdc-form-field edit-memory-form-field mat-mdc-form-field-type-mat-input mat-form-field-appearance-outline mat-primary ng-valid ng-touched\"><!----><div class=\"mat-mdc-text-field-wrapper mdc-text-field mdc-text-field--outlined mdc-text-field--no-label\"><!----><div class=\"mat-mdc-form-field-flex\"><div matformfieldnotchedoutline=\"\" class=\"mdc-notched-outline mdc-notched-outline--no-label ng-star-inserted\"><div class=\"mat-mdc-notch-piece mdc-notched-outline__leading\"></div><div class=\"mat-mdc-notch-piece mdc-notched-outline__notch\"><!----><!----><!----></div><div class=\"mat-mdc-notch-piece mdc-notched-outline__trailing\"></div></div><!----><!----><!----><div class=\"mat-mdc-form-field-infix\"><!----><textarea _ngcontent-ng-c4208921684=\"\" rows=\"1\" matinput=\"\" cdktextareaautosize=\"\" aria-label=\"Inserir nova memória\" placeholder=\"Por exemplo: &quot;Prefiro respostas curtas e concisas&quot;\" class=\"cdk-textarea-autosize mat-mdc-input-element edit-memory-input mat-mdc-form-field-textarea-control mat-mdc-form-field-input-control mdc-text-field__input ng-pristine ng-valid cdk-text-field-autofill-monitored ng-touched\" id=\"mat-input-0\" aria-invalid=\"false\" aria-required=\"false\" maxlength=\"10000\" style=\"height: 24px;\">    </textarea></div><!----><!----></div><!----></div><div aria-atomic=\"true\" aria-live=\"polite\" class=\"mat-mdc-form-field-subscript-wrapper mat-mdc-form-field-bottom-align mat-mdc-form-field-subscript-dynamic-size\"><!----><div class=\"mat-mdc-form-field-hint-wrapper ng-star-inserted\"><!----><div class=\"mat-mdc-form-field-hint-spacer\"></div></div><!----></div></mat-form-field></mat-dialog-content><mat-dialog-actions _ngcontent-ng-c4208921684=\"\" align=\"end\" class=\"mat-mdc-dialog-actions mdc-dialog__actions mat-mdc-dialog-actions-align-end\"><button _ngcontent-ng-c4208921684=\"\" mat-button=\"\" mat-dialog-close=\"\" color=\"primary\" class=\"mdc-button mat-mdc-button-base mat-mdc-button mat-primary _mat-animation-noopable\" mat-ripple-loader-uninitialized=\"\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" type=\"button\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\">Cancelar</span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span></button><button _ngcontent-ng-c4208921684=\"\" mat-flat-button=\"\" data-test-id=\"submit-button\" color=\"primary\" class=\"mdc-button mat-mdc-button-base edit-memory-submit-button mdc-button--unelevated mat-mdc-unelevated-button mat-primary mat-mdc-button-disabled _mat-animation-noopable\" mat-ripple-loader-uninitialized=\"\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" mat-ripple-loader-disabled=\"\" disabled=\"true\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c4208921684=\"\" class=\"ng-star-inserted\">Enviar</span><!----><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span></button></mat-dialog-actions></edit-memory-dialog><!----></div></div></mat-dialog-container><div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div></div></div></div>";
+  }
+
+  function getDeleteAllMemoriesButtonTemplate() {
+    return [
+      "<!---->",
+      "<button _ngcontent-ng-c4015516841=\"\" mat-stroked-button=\"\" class=\"mdc-button mat-mdc-button-base delete-all-memories-button mdc-button--outlined mat-mdc-outlined-button desktop mat-unthemed _mat-animation-noopable ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" style=\"\">",
+      "<span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span>",
+      "<mat-icon _ngcontent-ng-c4015516841=\"\" role=\"img\" fonticon=\"delete\" class=\"mat-icon notranslate google-symbols mat-ligature-font mat-icon-no-color\" aria-hidden=\"true\" data-mat-icon-type=\"font\" data-mat-icon-name=\"delete\"></mat-icon>",
+      "<span class=\"mdc-button__label\"><span _ngcontent-ng-c4015516841=\"\">Excluir tudo</span></span>",
+      "<!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span>",
+      "</button>",
+      "<!----><!---->"
+    ].join("");
+  }
+
+  function getMemoryItemTemplate(memory, index) {
+    return [
+      "<div _ngcontent-ng-c4015516841=\"\" class=\"memory ng-star-inserted\">",
+      "<div _ngcontent-ng-c4015516841=\"\" class=\"memory-text gds-body-l\" style=\"white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;\"> ",
+      escapeHtml(getMemoryDisplayText(memory)),
+      " </div>",
+      "<button _ngcontent-ng-c4015516841=\"\" mat-icon-button=\"\" aria-label=\"Abre um menu de contexto da informa\u00e7\u00e3o.\" class=\"mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-menu-trigger desktop memory-actions-button mat-unthemed _mat-animation-noopable ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" mat-ripple-loader-centered=\"\" aria-haspopup=\"menu\" aria-expanded=\"false\" data-memory-index=\"",
+      String(index),
+      "\">",
+      "<span class=\"mat-mdc-button-persistent-ripple mdc-icon-button__ripple\"></span>",
+      "<mat-icon _ngcontent-ng-c4015516841=\"\" role=\"img\" fonticon=\"more_vert\" class=\"mat-icon notranslate google-symbols mat-ligature-font mat-icon-no-color\" aria-hidden=\"true\" data-mat-icon-type=\"font\" data-mat-icon-name=\"more_vert\"></mat-icon>",
+      "<!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span>",
+      "</button>",
+      "<!----><mat-menu _ngcontent-ng-c4015516841=\"\" class=\"ng-star-inserted\"><!----></mat-menu><!---->",
+      "</div>"
+    ].join("");
+  }
+
+  function getSavedMemoriesSectionTemplate(memories) {
+    if (!memories.length) {
+      return [
+        "<!---->",
+        "<div _ngcontent-ng-c4015516841=\"\" class=\"empty-state ng-star-inserted\">",
+        "<span _ngcontent-ng-c4015516841=\"\">Voc\u00ea ainda n\u00e3o pediu para o Gemini salvar suas informa\u00e7\u00f5es</span>",
+        "</div>",
+        "<!---->"
+      ].join("");
+    }
+
+    return [
+      "<div _ngcontent-ng-c4015516841=\"\" class=\"memories-groups ng-star-inserted\" style=\"\">",
+      "<div _ngcontent-ng-c4015516841=\"\" class=\"memories-group ng-star-inserted\">",
+      "<!----><div _ngcontent-ng-c4015516841=\"\" class=\"memories-container\">",
+      memories.map(getMemoryItemTemplate).join("<!---->"),
+      "<!----></div></div><!----><!----></div><!----><!---->"
+    ].join("");
+  }
+
+  function syncSavedInfoPage() {
+    var page = document.querySelector("saved-info-page");
+    var actionButtonsContainer = page ? page.querySelector(".action-buttons-container") : null;
+    var memoriesSection = page ? page.querySelector("[data-test-id='memories-section']") : null;
+    var deleteButton = actionButtonsContainer ? actionButtonsContainer.querySelector(".delete-all-memories-button") : null;
+    var memories = getSavedMemories();
+
+    closeMemoryActionsMenu();
+
+    if (!page) {
+      return;
+    }
+
+    if (actionButtonsContainer) {
+      if (memories.length && !deleteButton) {
+        actionButtonsContainer.insertAdjacentHTML("beforeend", getDeleteAllMemoriesButtonTemplate());
+      } else if (!memories.length && deleteButton) {
+        deleteButton.remove();
+      }
+    }
+
+    if (memoriesSection) {
+      memoriesSection.innerHTML = getSavedMemoriesSectionTemplate(memories);
+    }
+
+    syncSavedInfoMemoryToggle();
+  }
+
+  function getMemoryActionsMenuWrapper() {
+    return document.getElementById(MEMORY_ACTIONS_MENU_WRAPPER_ID);
+  }
+
+  function ensureMemoryActionsMenuStyle() {
+    var style;
+
+    if (document.getElementById(MEMORY_ACTIONS_MENU_STYLE_ID)) {
+      return;
+    }
+
+    style = document.createElement("style");
+    style.id = MEMORY_ACTIONS_MENU_STYLE_ID;
+    style.textContent = [
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " {",
+      "  position: fixed;",
+      "  inset: 0;",
+      "  z-index: 1300;",
+      "  pointer-events: none;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .cdk-overlay-container {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  pointer-events: none;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .cdk-overlay-backdrop {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  pointer-events: auto;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .cdk-overlay-connected-position-bounding-box {",
+      "  position: absolute;",
+      "  display: flex;",
+      "  pointer-events: none;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .cdk-overlay-pane,",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .mat-mdc-menu-panel {",
+      "  pointer-events: auto;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .mat-mdc-menu-panel {",
+      "  min-width: 160px;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .mat-mdc-menu-content {",
+      "  padding: 8px 0;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .mat-mdc-menu-item {",
+      "  width: 100%;",
+      "  min-height: 48px;",
+      "  display: flex;",
+      "  align-items: center;",
+      "  gap: 12px;",
+      "  border: 0;",
+      "  background: transparent;",
+      "  color: inherit;",
+      "  padding: 0 16px;",
+      "  text-align: left;",
+      "  cursor: pointer;",
+      "}",
+      "#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .mat-mdc-menu-item:hover {",
+      "  background: rgba(60, 64, 67, .08);",
+      "}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function closeMemoryActionsMenu() {
+    var wrapper = getMemoryActionsMenuWrapper();
+
+    if (wrapper) {
+      wrapper.remove();
+    }
+
+    document.querySelectorAll("saved-info-page button.memory-actions-button[aria-expanded='true']").forEach(function (button) {
+      button.setAttribute("aria-expanded", "false");
+      button.removeAttribute("aria-controls");
+      button.classList.remove("cdk-focused", "cdk-mouse-focused");
+    });
+  }
+
+  function getMemoryActionsMenuBoxStyle(button) {
+    var rect = button.getBoundingClientRect();
+    var left = Math.max(8, Math.min(Math.round(rect.left), window.innerWidth - 314));
+    var top = Math.max(8, Math.min(Math.round(rect.bottom + 4), window.innerHeight - 112));
+    var width = Math.max(160, Math.round(window.innerWidth - left));
+    var height = Math.max(112, Math.round(window.innerHeight - top));
+
+    return "inset: " + top + "px auto auto " + left + "px; width: " + width + "px; height: " + height + "px; align-items: flex-start; justify-content: flex-start;";
+  }
+
+  function getMemoryActionsMenuTemplate(button) {
+    var index = button.getAttribute("data-memory-index") || "0";
+
+    return [
+      "<div class=\"cdk-overlay-container\">",
+      "<div class=\"cdk-overlay-backdrop cdk-overlay-backdrop-noop-animation cdk-overlay-transparent-backdrop cdk-overlay-backdrop-showing\"></div>",
+      "<div class=\"cdk-overlay-connected-position-bounding-box\" dir=\"ltr\" style=\"",
+      getMemoryActionsMenuBoxStyle(button),
+      "\">",
+      "<div id=\"cdk-overlay-22\" class=\"cdk-overlay-pane\" style=\"position: static;\">",
+      "<div tabindex=\"-1\" role=\"menu\" class=\"mat-mdc-menu-panel mat-menu-after mat-menu-below mat-menu-panel-animations-disabled ng-star-inserted\" id=\"",
+      MEMORY_ACTIONS_MENU_PANEL_ID,
+      "\" style=\"transform-origin: left top;\">",
+      "<div class=\"mat-mdc-menu-content\">",
+      "<button _ngcontent-ng-c4015516841=\"\" mat-menu-item=\"\" mattooltip=\"Editar esta informa\u00e7\u00e3o\" aria-label=\"Editar esta informa\u00e7\u00e3o\" data-test-id=\"edit-button\" data-memory-index=\"",
+      escapeHtml(index),
+      "\" class=\"mat-mdc-menu-item mat-focus-indicator mat-mdc-tooltip-trigger edit-button\" role=\"menuitem\" tabindex=\"0\" aria-disabled=\"false\">",
+      "<mat-icon _ngcontent-ng-c4015516841=\"\" role=\"img\" fonticon=\"edit\" class=\"mat-icon notranslate google-symbols mat-ligature-font mat-icon-no-color\" aria-hidden=\"true\" data-mat-icon-type=\"font\" data-mat-icon-name=\"edit\"></mat-icon>",
+      "<span class=\"mat-mdc-menu-item-text\"><span _ngcontent-ng-c4015516841=\"\">Editar</span></span>",
+      "<div matripple=\"\" class=\"mat-ripple mat-mdc-menu-ripple\"></div><!---->",
+      "</button>",
+      "<!---->",
+      "<button _ngcontent-ng-c4015516841=\"\" mat-menu-item=\"\" mattooltip=\"Excluir esta informa\u00e7\u00e3o\" aria-label=\"Excluir esta informa\u00e7\u00e3o\" data-test-id=\"delete-button\" data-memory-index=\"",
+      escapeHtml(index),
+      "\" class=\"mat-mdc-menu-item mat-focus-indicator mat-mdc-tooltip-trigger delete-button\" role=\"menuitem\" tabindex=\"0\" aria-disabled=\"false\">",
+      "<mat-icon _ngcontent-ng-c4015516841=\"\" role=\"img\" fonticon=\"delete\" class=\"mat-icon notranslate google-symbols mat-ligature-font mat-icon-no-color\" aria-hidden=\"true\" data-mat-icon-type=\"font\" data-mat-icon-name=\"delete\"></mat-icon>",
+      "<span class=\"mat-mdc-menu-item-text\"><span _ngcontent-ng-c4015516841=\"\">Excluir</span></span>",
+      "<div matripple=\"\" class=\"mat-ripple mat-mdc-menu-ripple\"></div><!---->",
+      "</button>",
+      "<!---->",
+      "</div></div></div></div></div>"
+    ].join("");
+  }
+
+  function openMemoryActionsMenu(button) {
+    var wrapper;
+
+    if (!button) {
+      return;
+    }
+
+    ensureMemoryActionsMenuStyle();
+    closeMemoryActionsMenu();
+
+    wrapper = document.createElement("div");
+    wrapper.id = MEMORY_ACTIONS_MENU_WRAPPER_ID;
+    wrapper.innerHTML = getMemoryActionsMenuTemplate(button);
+    document.body.appendChild(wrapper);
+
+    button.setAttribute("aria-expanded", "true");
+    button.setAttribute("aria-controls", MEMORY_ACTIONS_MENU_PANEL_ID);
+    button.classList.add("cdk-focused", "cdk-mouse-focused");
+  }
+
+  function ensureDeleteMemoryDialogStyle() {
+    var style;
+
+    if (document.getElementById(DELETE_MEMORY_DIALOG_STYLE_ID)) {
+      return;
+    }
+
+    style = document.createElement("style");
+    style.id = DELETE_MEMORY_DIALOG_STYLE_ID;
+    style.textContent = [
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " {",
+      "  position: fixed;",
+      "  inset: 0;",
+      "  z-index: 1500;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " {",
+      "  position: fixed;",
+      "  inset: 0;",
+      "  z-index: 1500;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-container {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .cdk-overlay-container {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .cdk-global-overlay-wrapper {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  display: flex;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .cdk-global-overlay-wrapper {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  display: flex;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-surface {",
+      "  border-radius: 32px;",
+      "  width: 600px;",
+      "  height: 133px;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-surface {",
+      "  border-radius: 32px;",
+      "  width: 600px;",
+      "  height: 133px;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-title {",
+      "  padding: 24px 24px 0;",
+      "  margin: 0;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-title {",
+      "  padding: 24px 24px 0;",
+      "  margin: 0;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-content {",
+      "  padding: 0 24px;",
+      "  min-height: 0;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-content {",
+      "  padding: 0 24px;",
+      "  min-height: 0;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-actions {",
+      "  box-sizing: border-box;",
+      "  width: 100%;",
+      "  height: 68px;",
+      "  padding: 16px 16px 16px 24px;",
+      "  gap: 8px;",
+      "  justify-content: flex-end;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-actions {",
+      "  box-sizing: border-box;",
+      "  width: 100%;",
+      "  height: 68px;",
+      "  padding: 16px 16px 16px 24px;",
+      "  gap: 8px;",
+      "  justify-content: flex-end;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button button {",
+      "  border: 0;",
+      "  border-radius: 999px;",
+      "  background: #f1f1f1;",
+      "  color: #1f1f1f;",
+      "  min-height: 36px;",
+      "  height: 36px;",
+      "  padding: 0;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button {",
+      "  border: 0;",
+      "  border-radius: 999px;",
+      "  background: #f1f1f1;",
+      "  color: #1f1f1f;",
+      "  min-height: 36px;",
+      "  height: 36px;",
+      "  padding: 0;",
+      "  cursor: pointer;",
+      "  white-space: nowrap;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button[data-test-id='cancel-button'] button {",
+      "  width: 84.41px;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button[data-test-id='confirm-button'] button {",
+      "  width: 67.92px;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button:first-of-type button {",
+      "  width: 103.14px;",
+      "}",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button:nth-of-type(2) button {",
+      "  width: 84.41px;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button button:hover,",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button:hover {",
+      "  background: #e9e9e9;",
+      "}",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button button .mdc-button__label,",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button .mdc-button__label,",
+      "#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " gem-button button .gds-body-m,",
+      "#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " gem-button button .gds-body-m {",
+      "  color: #1f1f1f;",
+      "}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function getDeleteMemoryDialogTemplate(index) {
+    return [
+      "<div class=\"cdk-overlay-container\">",
+      "<div class=\"cdk-overlay-backdrop cdk-overlay-backdrop-noop-animation cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing\"></div>",
+      "<div class=\"cdk-global-overlay-wrapper\" dir=\"ltr\" style=\"justify-content: center; align-items: center;\">",
+      "<div id=\"cdk-overlay-27\" class=\"cdk-overlay-pane mat-mdc-dialog-panel lumi-dialog\" style=\"width: calc(-48px + 100vw); max-width: 600px; position: static;\">",
+      "<div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div>",
+      "<mat-dialog-container tabindex=\"-1\" class=\"mat-mdc-dialog-container mdc-dialog cdk-dialog-container mdc-dialog--open _mat-animation-noopable mat-mdc-dialog-container-with-actions\" id=\"mat-mdc-dialog-10\" role=\"dialog\" aria-modal=\"false\" aria-label=\"Excluir estas informa\u00e7\u00f5es\">",
+      "<div class=\"mat-mdc-dialog-inner-container mdc-dialog__container\"><div class=\"mat-mdc-dialog-surface mdc-dialog__surface\">",
+      "<message-dialog _nghost-ng-c2311401154=\"\" class=\"mat-mdc-dialog-component-host ng-star-inserted\">",
+      "<h1 _ngcontent-ng-c2311401154=\"\" mat-dialog-title=\"\" data-test-id=\"message-dialog-title\" class=\"mat-mdc-dialog-title mdc-dialog__title\" id=\"mat-mdc-dialog-title-10\">Excluir instru\u00e7\u00f5es?</h1>",
+      "<mat-dialog-content _ngcontent-ng-c2311401154=\"\" class=\"mat-mdc-dialog-content mdc-dialog__content\">",
+      "<span _ngcontent-ng-c2311401154=\"\" data-test-id=\"message-dialog-content\" class=\"message-dialog-content\"></span><!---->",
+      "</mat-dialog-content>",
+      "<mat-dialog-actions _ngcontent-ng-c2311401154=\"\" align=\"end\" class=\"mat-mdc-dialog-actions mdc-dialog__actions mat-mdc-dialog-actions-align-end\">",
+      "<!---->",
+      "<gem-button _ngcontent-ng-c2311401154=\"\" theme=\"lm\" type=\"tonal\" data-test-id=\"cancel-button\" _nghost-ng-c3985705569=\"\" class=\"gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-tonal lm-enabled ng-star-inserted\">",
+      "<!----><button _ngcontent-ng-c3985705569=\"\" matbadgeposition=\"after\" class=\"mdc-button mat-mdc-button-base mat-badge mat-tonal-button mat-unthemed _mat-animation-noopable mat-badge-overlap mat-badge-above mat-badge-after mat-badge-small mat-badge-hidden ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\">",
+      "<span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c3985705569=\"\" class=\"gem-button-content ng-star-inserted\"><!----><span _ngcontent-ng-c3985705569=\"\" class=\"gds-body-m\"> Cancelar </span><!----></span><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span>",
+      "</button><!----><!----></gem-button><!---->",
+      "<gem-button _ngcontent-ng-c2311401154=\"\" cdkfocusinitial=\"\" theme=\"lm\" type=\"tonal\" data-test-id=\"confirm-button\" data-memory-index=\"",
+      escapeHtml(String(index)),
+      "\" _nghost-ng-c3985705569=\"\" class=\"gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-tonal lm-enabled ng-star-inserted\">",
+      "<!----><button _ngcontent-ng-c3985705569=\"\" matbadgeposition=\"after\" class=\"mdc-button mat-mdc-button-base mat-badge mat-tonal-button mat-unthemed _mat-animation-noopable mat-badge-overlap mat-badge-above mat-badge-after mat-badge-small mat-badge-hidden ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\">",
+      "<span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c3985705569=\"\" class=\"gem-button-content ng-star-inserted\"><!----><span _ngcontent-ng-c3985705569=\"\" class=\"gds-body-m\"> Excluir </span><!----></span><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span>",
+      "</button><!----><!----></gem-button><!----><!----><!---->",
+      "</mat-dialog-actions>",
+      "</message-dialog><!----></div></div></mat-dialog-container>",
+      "<div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div>",
+      "</div></div></div>"
+    ].join("");
+  }
+
+  function closeDeleteMemoryDialog() {
+    var wrapper = getDeleteMemoryDialogWrapper();
+
+    if (wrapper) {
+      wrapper.remove();
+    }
+  }
+
+  function getDeleteAllMemoriesDialogTemplate() {
+    return [
+      "<div class=\"cdk-overlay-container\">",
+      "<div class=\"cdk-overlay-backdrop cdk-overlay-backdrop-noop-animation cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing\"></div>",
+      "<div class=\"cdk-global-overlay-wrapper\" dir=\"ltr\" style=\"justify-content: center; align-items: center;\">",
+      "<div id=\"cdk-overlay-29\" class=\"cdk-overlay-pane mat-mdc-dialog-panel lumi-dialog\" style=\"width: calc(-48px + 100vw); max-width: 600px; position: static;\">",
+      "<div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div>",
+      "<mat-dialog-container tabindex=\"-1\" class=\"mat-mdc-dialog-container mdc-dialog cdk-dialog-container mdc-dialog--open _mat-animation-noopable mat-mdc-dialog-container-with-actions\" id=\"mat-mdc-dialog-12\" role=\"dialog\" aria-modal=\"false\" aria-label=\"Excluir todas as instru\u00e7\u00f5es\">",
+      "<div class=\"mat-mdc-dialog-inner-container mdc-dialog__container\"><div class=\"mat-mdc-dialog-surface mdc-dialog__surface\">",
+      "<message-dialog _nghost-ng-c2311401154=\"\" class=\"mat-mdc-dialog-component-host ng-star-inserted\">",
+      "<h1 _ngcontent-ng-c2311401154=\"\" mat-dialog-title=\"\" data-test-id=\"message-dialog-title\" class=\"mat-mdc-dialog-title mdc-dialog__title\" id=\"mat-mdc-dialog-title-12\">Excluir todas as instru\u00e7\u00f5es?</h1>",
+      "<mat-dialog-content _ngcontent-ng-c2311401154=\"\" class=\"mat-mdc-dialog-content mdc-dialog__content\">",
+      "<span _ngcontent-ng-c2311401154=\"\" data-test-id=\"message-dialog-content\" class=\"message-dialog-content\"></span><!---->",
+      "</mat-dialog-content>",
+      "<mat-dialog-actions _ngcontent-ng-c2311401154=\"\" align=\"end\" class=\"mat-mdc-dialog-actions mdc-dialog__actions mat-mdc-dialog-actions-align-end\">",
+      "<gem-button _ngcontent-ng-c2311401154=\"\" theme=\"lm\" type=\"tonal\" data-test-id=\"button.dataTestId\" _nghost-ng-c3985705569=\"\" class=\"gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-tonal lm-enabled ng-star-inserted\"><!----><button _ngcontent-ng-c3985705569=\"\" matbadgeposition=\"after\" class=\"mdc-button mat-mdc-button-base mat-badge mat-tonal-button mat-unthemed _mat-animation-noopable mat-badge-overlap mat-badge-above mat-badge-after mat-badge-small mat-badge-hidden ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" jslog=\"305700;track:generic_click,impression;BardVeMetadataKey:[null,null,null,null,null,null,null,[&quot;&quot;]]\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c3985705569=\"\" class=\"gem-button-content ng-star-inserted\"><!----><span _ngcontent-ng-c3985705569=\"\" class=\"gds-body-m\"> Excluir tudo </span><!----></span><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span></button><!----><!----></gem-button>",
+      "<gem-button _ngcontent-ng-c2311401154=\"\" theme=\"lm\" type=\"tonal\" data-test-id=\"button.dataTestId\" _nghost-ng-c3985705569=\"\" class=\"gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-tonal lm-enabled ng-star-inserted\"><!----><button _ngcontent-ng-c3985705569=\"\" matbadgeposition=\"after\" class=\"mdc-button mat-mdc-button-base mat-badge mat-tonal-button mat-unthemed _mat-animation-noopable mat-badge-overlap mat-badge-above mat-badge-after mat-badge-small mat-badge-hidden ng-star-inserted\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" jslog=\"305700;track:generic_click,impression;BardVeMetadataKey:[null,null,null,null,null,null,null,[&quot;&quot;]]\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c3985705569=\"\" class=\"gem-button-content ng-star-inserted\"><!----><span _ngcontent-ng-c3985705569=\"\" class=\"gds-body-m\"> Cancelar </span><!----></span><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span><span class=\"mat-ripple mat-mdc-button-ripple\"></span></button><!----><!----></gem-button><!----><!----><!----><!----><!---->",
+      "</mat-dialog-actions>",
+      "</message-dialog><!----></div></div></mat-dialog-container>",
+      "<div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div>",
+      "</div></div></div>"
+    ].join("");
+  }
+
+  function closeDeleteAllMemoriesDialog() {
+    var wrapper = getDeleteAllMemoriesDialogWrapper();
+
+    if (wrapper) {
+      wrapper.remove();
+    }
+  }
+
+  function openDeleteAllMemoriesDialog() {
+    var wrapper;
+
+    ensureEditMemoryDialogExtractedStyles();
+    ensureDeleteMemoryDialogStyle();
+    closeDeleteAllMemoriesDialog();
+
+    wrapper = document.createElement("div");
+    wrapper.id = DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID;
+    wrapper.innerHTML = getDeleteAllMemoriesDialogTemplate();
+    document.body.appendChild(wrapper);
+  }
+
+  function openDeleteMemoryDialog(index) {
+    var wrapper;
+
+    ensureEditMemoryDialogExtractedStyles();
+    ensureDeleteMemoryDialogStyle();
+    closeDeleteMemoryDialog();
+    closeMemoryActionsMenu();
+
+    wrapper = document.createElement("div");
+    wrapper.id = DELETE_MEMORY_DIALOG_WRAPPER_ID;
+    wrapper.innerHTML = getDeleteMemoryDialogTemplate(index);
+    document.body.appendChild(wrapper);
   }
 
   function ensureEditMemoryDialogStyle() {
@@ -184,8 +936,46 @@
       "  inset: 0;",
       "  display: flex;",
       "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-surface {",
+      "  max-height: calc(100vh - 48px);",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-dialog-content {",
+      "  overflow-y: auto;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .mat-mdc-form-field-infix {",
+      "  width: 100%;",
+      "}",
       "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " textarea.edit-memory-input {",
       "  resize: none;",
+      "  width: 100%;",
+      "  min-height: 24px;",
+      "  line-height: 24px;",
+      "  overflow-x: hidden;",
+      "  overflow-y: hidden;",
+      "  white-space: pre-wrap !important;",
+      "  overflow-wrap: anywhere;",
+      "  word-break: break-word;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .edit-memory-submit-button .mdc-button__label {",
+      "  display: inline-flex;",
+      "  align-items: center;",
+      "  justify-content: center;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .edit-memory-submit-button mat-progress-spinner {",
+      "  display: inline-flex;",
+      "  color: currentColor;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .edit-memory-submit-button mat-progress-spinner circle {",
+      "  stroke: currentColor;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .edit-memory-submit-button .mdc-circular-progress__indeterminate-container {",
+      "  animation: gemini-edit-memory-spinner-rotate 1.4s linear infinite;",
+      "  transform-origin: center;",
+      "}",
+      "@keyframes gemini-edit-memory-spinner-rotate {",
+      "  to {",
+      "    transform: rotate(360deg);",
+      "  }",
       "}"
     ].join("\n");
     document.head.appendChild(style);
@@ -213,15 +1003,204 @@
 
   function closeEditMemoryDialog() {
     var wrapper = getEditMemoryDialogWrapper();
+    var submitButton = wrapper ? wrapper.querySelector("button.edit-memory-submit-button[data-test-id='submit-button']") : null;
+
+    if (submitButton) {
+      window.clearTimeout(submitButton.geminiEditMemoryLoadingTimer);
+    }
 
     if (wrapper) {
       wrapper.remove();
     }
   }
 
-  function openEditMemoryDialog() {
+  function getEditMemorySubmitSpinnerTemplate() {
+    return [
+      "<!---->",
+      "<mat-progress-spinner _ngcontent-ng-c4208921684=\"\" role=\"progressbar\" tabindex=\"-1\"",
+      " mode=\"indeterminate\" diameter=\"20\" aria-label=\"Salvando a mem\u00f3ria\"",
+      " class=\"mat-mdc-progress-spinner mdc-circular-progress mat-progress-spinner-reduced-motion mat-primary mdc-circular-progress--indeterminate ng-star-inserted\"",
+      " aria-valuemin=\"0\" aria-valuemax=\"100\"",
+      " style=\"width: 20px; height: 20px; --mat-progress-spinner-size: 20px; --mat-progress-spinner-active-indicator-width: 20px;\">",
+      "<!---->",
+      "<div aria-hidden=\"true\" class=\"mdc-circular-progress__determinate-container\">",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" class=\"mdc-circular-progress__determinate-circle-graphic\" viewBox=\"0 0 12 12\">",
+      "<circle cx=\"50%\" cy=\"50%\" class=\"mdc-circular-progress__determinate-circle\" r=\"5\" style=\"stroke-dasharray: 31.4159px; stroke-width: 10%;\"></circle>",
+      "</svg>",
+      "</div>",
+      "<div aria-hidden=\"true\" class=\"mdc-circular-progress__indeterminate-container\">",
+      "<div class=\"mdc-circular-progress__spinner-layer\">",
+      "<div class=\"mdc-circular-progress__circle-clipper mdc-circular-progress__circle-left\">",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" class=\"mdc-circular-progress__indeterminate-circle-graphic ng-star-inserted\" viewBox=\"0 0 12 12\">",
+      "<circle cx=\"50%\" cy=\"50%\" r=\"5\" style=\"stroke-dasharray: 31.4159px; stroke-dashoffset: 15.708px; stroke-width: 10%;\"></circle>",
+      "</svg>",
+      "<!---->",
+      "</div>",
+      "<div class=\"mdc-circular-progress__gap-patch\">",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" class=\"mdc-circular-progress__indeterminate-circle-graphic ng-star-inserted\" viewBox=\"0 0 12 12\">",
+      "<circle cx=\"50%\" cy=\"50%\" r=\"5\" style=\"stroke-dasharray: 31.4159px; stroke-dashoffset: 15.708px; stroke-width: 10%;\"></circle>",
+      "</svg>",
+      "<!---->",
+      "</div>",
+      "<div class=\"mdc-circular-progress__circle-clipper mdc-circular-progress__circle-right\">",
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\" class=\"mdc-circular-progress__indeterminate-circle-graphic ng-star-inserted\" viewBox=\"0 0 12 12\">",
+      "<circle cx=\"50%\" cy=\"50%\" r=\"5\" style=\"stroke-dasharray: 31.4159px; stroke-dashoffset: 15.708px; stroke-width: 10%;\"></circle>",
+      "</svg>",
+      "<!---->",
+      "</div>",
+      "</div>",
+      "</div>",
+      "</mat-progress-spinner>",
+      "<!----><!---->"
+    ].join("");
+  }
+
+  function setEditMemorySubmitLoading(wrapper, loading, onComplete) {
+    var submitButton = wrapper ? wrapper.querySelector("button.edit-memory-submit-button[data-test-id='submit-button']") : null;
+    var label = submitButton ? submitButton.querySelector(".mdc-button__label") : null;
+
+    if (!submitButton || !label) {
+      return;
+    }
+
+    window.clearTimeout(submitButton.geminiEditMemoryLoadingTimer);
+    submitButton.geminiEditMemoryLoadingTimer = null;
+
+    if (loading) {
+      submitButton.dataset.geminiMemoryLoading = "true";
+      submitButton.disabled = false;
+      submitButton.classList.remove("mat-mdc-button-disabled");
+      submitButton.classList.add("cdk-focused", "cdk-mouse-focused");
+      submitButton.removeAttribute("disabled");
+      submitButton.removeAttribute("mat-ripple-loader-disabled");
+      submitButton.removeAttribute("mat-ripple-loader-uninitialized");
+      submitButton.setAttribute("aria-disabled", "false");
+      label.innerHTML = getEditMemorySubmitSpinnerTemplate();
+      submitButton.geminiEditMemoryLoadingTimer = window.setTimeout(function () {
+        if (typeof onComplete === "function") {
+          onComplete();
+          return;
+        }
+
+        setEditMemorySubmitLoading(wrapper, false);
+      }, EDIT_MEMORY_SUBMIT_LOADING_DURATION);
+      return;
+    }
+
+    delete submitButton.dataset.geminiMemoryLoading;
+    submitButton.classList.remove("cdk-focused", "cdk-mouse-focused");
+    label.innerHTML = "<span _ngcontent-ng-c4208921684=\"\" class=\"ng-star-inserted\">Enviar</span><!----><!---->";
+    syncEditMemorySubmitButton(wrapper);
+  }
+
+  function syncEditMemorySubmitButton(wrapper) {
+    var textarea = wrapper ? wrapper.querySelector("textarea.edit-memory-input") : null;
+    var submitButton = wrapper ? wrapper.querySelector("button.edit-memory-submit-button[data-test-id='submit-button']") : null;
+    var hasText = textarea ? textarea.value.trim().length > 0 : false;
+
+    if (!submitButton) {
+      return;
+    }
+
+    if (submitButton.dataset.geminiMemoryLoading === "true") {
+      return;
+    }
+
+    submitButton.disabled = !hasText;
+    submitButton.classList.toggle("mat-mdc-button-disabled", !hasText);
+    submitButton.toggleAttribute("disabled", !hasText);
+    submitButton.toggleAttribute("mat-ripple-loader-disabled", !hasText);
+    submitButton.setAttribute("aria-disabled", hasText ? "false" : "true");
+
+    if (hasText) {
+      submitButton.removeAttribute("mat-ripple-loader-uninitialized");
+    } else {
+      submitButton.setAttribute("mat-ripple-loader-uninitialized", "");
+    }
+  }
+
+  function syncEditMemoryTextareaSize(textarea) {
+    if (!textarea) {
+      return;
+    }
+
+    textarea.setAttribute("wrap", "soft");
+    textarea.style.height = EDIT_MEMORY_INPUT_MIN_HEIGHT + "px";
+    textarea.style.height = Math.max(textarea.scrollHeight, EDIT_MEMORY_INPUT_MIN_HEIGHT) + "px";
+    textarea.style.overflowY = "hidden";
+  }
+
+  function syncEditMemoryInput(wrapper) {
+    var textarea = wrapper ? wrapper.querySelector("textarea.edit-memory-input") : null;
+
+    syncEditMemoryTextareaSize(textarea);
+    syncEditMemorySubmitButton(wrapper);
+  }
+
+  function bindEditMemoryInput(wrapper, options) {
+    var textarea = wrapper ? wrapper.querySelector("textarea.edit-memory-input") : null;
+    var submitButton = wrapper ? wrapper.querySelector("button.edit-memory-submit-button[data-test-id='submit-button']") : null;
+    var mode = options && options.mode === "edit" ? "edit" : "create";
+    var memoryIndex = options ? options.memoryIndex : -1;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.addEventListener("input", function () {
+      syncEditMemoryInput(wrapper);
+    });
+
+    textarea.addEventListener("keyup", function () {
+      syncEditMemoryInput(wrapper);
+    });
+
+    textarea.addEventListener("paste", function () {
+      window.requestAnimationFrame(function () {
+        syncEditMemoryInput(wrapper);
+      });
+    });
+
+    textarea.addEventListener("cut", function () {
+      window.requestAnimationFrame(function () {
+        syncEditMemoryInput(wrapper);
+      });
+    });
+
+    if (submitButton) {
+      submitButton.addEventListener("click", function (event) {
+        var memoryText = textarea.value.trim();
+
+        if (submitButton.disabled || submitButton.dataset.geminiMemoryLoading === "true") {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        setEditMemorySubmitLoading(wrapper, true, function () {
+          var snackbarMessage = "Informa\u00e7\u00f5es salvas";
+
+          if (mode === "edit") {
+            updateSavedMemory(memoryIndex, memoryText);
+            snackbarMessage = "Mudan\u00e7as salvas";
+          } else {
+            addSavedMemory(memoryText);
+          }
+
+          closeEditMemoryDialog();
+          syncSavedInfoPage();
+          showSavedInfoSnackbar(snackbarMessage);
+        });
+      });
+    }
+
+    syncEditMemoryInput(wrapper);
+  }
+
+  function openEditMemoryDialog(options) {
     var wrapper = getEditMemoryDialogWrapper();
     var textarea;
+    var initialValue = options && options.initialValue ? String(options.initialValue) : "";
 
     ensureEditMemoryDialogExtractedStyles();
     ensureEditMemoryDialogStyle();
@@ -237,10 +1216,13 @@
 
     textarea = wrapper.querySelector("textarea.edit-memory-input");
     if (textarea) {
-      textarea.value = "";
+      textarea.setAttribute("wrap", "soft");
+      textarea.value = initialValue;
       textarea.focus();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
+
+    bindEditMemoryInput(wrapper, options || {});
   }
 
   function getPersonalMemoryToggleButton(target) {
@@ -249,20 +1231,52 @@
       : null;
   }
 
-  function togglePersonalMemory(button) {
-    var slideToggle = button ? button.closest("mat-slide-toggle[data-test-id='enable-personal-gemini-context-toggle']") : null;
-    var checked = button ? button.getAttribute("aria-checked") === "true" : false;
-    var nextChecked = !checked;
+  function getSavedInfoMemoryToggleButton(target) {
+    return target && target.closest
+      ? target.closest("saved-info-page mat-slide-toggle[data-test-id='enable-memory-toggle'] button[role='switch']")
+      : null;
+  }
+
+  function setSlideToggleChecked(button, checked) {
+    var slideToggle = button ? button.closest("mat-slide-toggle") : null;
 
     if (!button || !slideToggle) {
       return;
     }
 
-    slideToggle.classList.toggle("mat-mdc-slide-toggle-checked", nextChecked);
-    button.classList.toggle("mdc-switch--selected", nextChecked);
-    button.classList.toggle("mdc-switch--checked", nextChecked);
-    button.classList.toggle("mdc-switch--unselected", !nextChecked);
-    button.setAttribute("aria-checked", nextChecked ? "true" : "false");
+    slideToggle.classList.toggle("mat-mdc-slide-toggle-checked", checked);
+    button.classList.toggle("mdc-switch--selected", checked);
+    button.classList.toggle("mdc-switch--checked", checked);
+    button.classList.toggle("mdc-switch--unselected", !checked);
+    button.setAttribute("aria-checked", checked ? "true" : "false");
+  }
+
+  function togglePersonalMemory(button) {
+    var checked = button ? button.getAttribute("aria-checked") === "true" : false;
+
+    setSlideToggleChecked(button, !checked);
+  }
+
+  function isSavedInfoMemoryEnabled() {
+    return window.localStorage.getItem(SAVED_INFO_MEMORY_ENABLED_STORAGE_KEY) !== "false";
+  }
+
+  function setSavedInfoMemoryEnabled(enabled) {
+    window.localStorage.setItem(SAVED_INFO_MEMORY_ENABLED_STORAGE_KEY, enabled ? "true" : "false");
+  }
+
+  function syncSavedInfoMemoryToggle() {
+    var button = document.querySelector("saved-info-page mat-slide-toggle[data-test-id='enable-memory-toggle'] button[role='switch']");
+
+    setSlideToggleChecked(button, isSavedInfoMemoryEnabled());
+  }
+
+  function toggleSavedInfoMemory(button) {
+    var checked = button ? button.getAttribute("aria-checked") === "true" : false;
+    var nextChecked = !checked;
+
+    setSavedInfoMemoryEnabled(nextChecked);
+    setSlideToggleChecked(button, nextChecked);
   }
 
   function ensurePersonalIntelligenceStyles() {
@@ -325,6 +1339,61 @@
     document.head.appendChild(style);
   }
 
+  function clearSideNavActiveState() {
+    document.querySelectorAll("bard-sidenav .is-active, bard-sidenav .mdc-list-item--activated").forEach(function (element) {
+      element.classList.remove("is-active", "mdc-list-item--activated");
+    });
+
+    document.querySelectorAll("bard-sidenav [aria-current]").forEach(function (element) {
+      element.removeAttribute("aria-current");
+    });
+
+    document.querySelectorAll("bard-sidenav .trailing-text-container").forEach(function (element) {
+      element.remove();
+    });
+  }
+
+  function setNewChatActiveState() {
+    var item = document.querySelector("bard-sidenav gem-nav-list-item[data-test-id='new-chat-button']");
+    var iconButton = item ? item.querySelector("gem-icon-button") : null;
+    var link = item ? item.querySelector("a") : null;
+
+    clearSideNavActiveState();
+
+    if (iconButton) {
+      iconButton.classList.add("is-active");
+      iconButton.setAttribute("aria-current", "page");
+    }
+
+    if (link) {
+      link.classList.add("is-active");
+      link.setAttribute("aria-current", "page");
+
+      if (link.classList.contains("mat-mdc-list-item")) {
+        link.classList.add("mdc-list-item--activated");
+      }
+    }
+  }
+
+  function renderChatIndexPage() {
+    var content = document.querySelector("bard-sidenav-content");
+
+    rememberInitialChatContentTemplate();
+
+    if (!content || !initialChatContentTemplate) {
+      return;
+    }
+
+    closeSettingsMenu();
+    closeMemoryActionsMenu();
+    closeDeleteMemoryDialog();
+    closeDeleteAllMemoriesDialog();
+    closeEditMemoryDialog();
+    document.body.classList.remove(PERSONAL_INTELLIGENCE_ACTIVE_CLASS);
+    content.outerHTML = initialChatContentTemplate;
+    setNewChatActiveState();
+  }
+
   function renderPersonalIntelligencePage() {
     var content = document.querySelector("bard-sidenav-content");
     var template = window.GEMINI_PERSONAL_INTELLIGENCE_TEMPLATE || "";
@@ -335,7 +1404,9 @@
 
     ensurePersonalIntelligenceStyles();
     ensurePersonalIntelligenceTopControlsStyle();
+    rememberInitialChatContentTemplate();
     document.body.classList.add(PERSONAL_INTELLIGENCE_ACTIVE_CLASS);
+    clearSideNavActiveState();
     content.outerHTML = template;
     closeSettingsMenu();
   }
@@ -350,8 +1421,11 @@
 
     ensureSavedInfoStyles();
     ensurePersonalIntelligenceTopControlsStyle();
+    rememberInitialChatContentTemplate();
     document.body.classList.add(PERSONAL_INTELLIGENCE_ACTIVE_CLASS);
+    clearSideNavActiveState();
     content.outerHTML = template;
+    syncSavedInfoPage();
   }
 
   function getThemeMenuButton(target) {
@@ -753,16 +1827,33 @@
   document.addEventListener("click", function (event) {
     var settingsButton = getSettingsButton(event.target);
     var settingsWrapper = getSettingsMenuWrapper();
+    var newChatButton = getNewChatButton(event.target);
     var personalIntelligenceItem = getPersonalIntelligenceMenuItem(event.target);
     var savedInfoLink = getSavedInfoLink(event.target);
     var savedInfoAddButton = getSavedInfoAddButton(event.target);
+    var deleteAllMemoriesButton = getDeleteAllMemoriesButton(event.target);
+    var memoryActionsButton = getMemoryActionsButton(event.target);
+    var memoryActionDeleteButton = getMemoryActionDeleteButton(event.target);
+    var memoryActionEditButton = getMemoryActionEditButton(event.target);
+    var deleteMemoryCancelButton = getDeleteMemoryCancelButton(event.target);
+    var deleteMemoryConfirmButton = getDeleteMemoryConfirmButton(event.target);
+    var deleteAllMemoriesCancelButton = getDeleteAllMemoriesCancelButton(event.target);
+    var deleteAllMemoriesConfirmButton = getDeleteAllMemoriesConfirmButton(event.target);
     var personalMemoryToggle = getPersonalMemoryToggleButton(event.target);
+    var savedInfoMemoryToggle = getSavedInfoMemoryToggleButton(event.target);
     var expandableToggle = getExpandableSectionToggle(event.target);
 
     if (settingsButton) {
       event.preventDefault();
       event.stopPropagation();
       toggleSettingsMenu(settingsButton);
+      return;
+    }
+
+    if (newChatButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      renderChatIndexPage();
       return;
     }
 
@@ -787,6 +1878,97 @@
       return;
     }
 
+    if (memoryActionsButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMemoryActionsMenu(memoryActionsButton);
+      return;
+    }
+
+    if (memoryActionEditButton) {
+      var editIndex = Number(memoryActionEditButton.getAttribute("data-memory-index"));
+      var editMemory = getSavedMemories()[editIndex] || "";
+
+      event.preventDefault();
+      event.stopPropagation();
+      closeMemoryActionsMenu();
+      openEditMemoryDialog({
+        mode: "edit",
+        memoryIndex: editIndex,
+        initialValue: editMemory
+      });
+      return;
+    }
+
+    if (memoryActionDeleteButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openDeleteMemoryDialog(Number(memoryActionDeleteButton.getAttribute("data-memory-index")));
+      return;
+    }
+
+    if (deleteMemoryCancelButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDeleteMemoryDialog();
+      return;
+    }
+
+    if (deleteMemoryConfirmButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      deleteSavedMemory(Number(deleteMemoryConfirmButton.closest("gem-button").getAttribute("data-memory-index")));
+      closeDeleteMemoryDialog();
+      syncSavedInfoPage();
+      showSavedInfoSnackbar("Informa\u00e7\u00f5es exclu\u00eddas");
+      return;
+    }
+
+    if (deleteAllMemoriesButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openDeleteAllMemoriesDialog();
+      return;
+    }
+
+    if (deleteAllMemoriesCancelButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDeleteAllMemoriesDialog();
+      return;
+    }
+
+    if (deleteAllMemoriesConfirmButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      setSavedMemories([]);
+      closeDeleteAllMemoriesDialog();
+      syncSavedInfoPage();
+      showSavedInfoSnackbar("Todas as informa\u00e7\u00f5es foram exclu\u00eddas", "delete-all-snackbar");
+      return;
+    }
+
+    if (event.target.closest && event.target.closest("#" + MEMORY_ACTIONS_MENU_WRAPPER_ID + " .cdk-overlay-backdrop")) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMemoryActionsMenu();
+      return;
+    }
+
+    if (event.target.closest && event.target.closest("#" + DELETE_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop")) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDeleteMemoryDialog();
+      return;
+    }
+
+    if (event.target.closest && event.target.closest("#" + DELETE_ALL_MEMORIES_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop")) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDeleteAllMemoriesDialog();
+      return;
+    }
+
     if (event.target.closest && event.target.closest("#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop, #" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " button[mat-dialog-close]")) {
       event.preventDefault();
       event.stopPropagation();
@@ -798,6 +1980,13 @@
       event.preventDefault();
       event.stopPropagation();
       togglePersonalMemory(personalMemoryToggle);
+      return;
+    }
+
+    if (savedInfoMemoryToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSavedInfoMemory(savedInfoMemoryToggle);
       return;
     }
 
@@ -837,6 +2026,24 @@
   }, true);
 
   document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && getDeleteAllMemoriesDialogWrapper()) {
+      event.preventDefault();
+      closeDeleteAllMemoriesDialog();
+      return;
+    }
+
+    if (event.key === "Escape" && getDeleteMemoryDialogWrapper()) {
+      event.preventDefault();
+      closeDeleteMemoryDialog();
+      return;
+    }
+
+    if (event.key === "Escape" && getMemoryActionsMenuWrapper()) {
+      event.preventDefault();
+      closeMemoryActionsMenu();
+      return;
+    }
+
     if (event.key === "Escape" && getEditMemoryDialogWrapper()) {
       event.preventDefault();
       closeEditMemoryDialog();
@@ -963,11 +2170,13 @@
     document.addEventListener("DOMContentLoaded", function () {
       ensureCloseButtonStyles();
       rememberCollapsedTemplate();
+      rememberInitialChatContentTemplate();
       syncOpenButton(false);
     });
   } else {
     ensureCloseButtonStyles();
     rememberCollapsedTemplate();
+    rememberInitialChatContentTemplate();
     syncOpenButton(false);
   }
 })();
