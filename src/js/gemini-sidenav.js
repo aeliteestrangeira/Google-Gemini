@@ -17,6 +17,13 @@
   var HELP_SUBMENU_EXPANDED_BOX_STYLE = "inset: 469px auto auto 538px; width: 828px; height: 178px; align-items: flex-start; justify-content: flex-start;";
   var HELP_SUBMENU_COLLAPSED_BOX_STYLE = "inset: 429px auto auto 302px; width: 1064px; height: 218px; align-items: flex-start; justify-content: flex-start;";
   var HELP_SUBMENU_ID = "mat-menu-panel-2";
+  var PERSONAL_INTELLIGENCE_STYLES_ID = "gemini-personal-intelligence-styles";
+  var PERSONAL_INTELLIGENCE_ACTIVE_CLASS = "gemini-personal-intelligence-active";
+  var PERSONAL_INTELLIGENCE_TOP_CONTROLS_STYLE_ID = "gemini-personal-intelligence-top-controls-style";
+  var SAVED_INFO_STYLES_ID = "gemini-saved-info-styles";
+  var EDIT_MEMORY_DIALOG_WRAPPER_ID = "gemini-edit-memory-dialog-overlay";
+  var EDIT_MEMORY_DIALOG_STYLE_ID = "gemini-edit-memory-dialog-style";
+  var EDIT_MEMORY_DIALOG_EXTRACTED_STYLES_ID = "gemini-edit-memory-dialog-extracted-styles";
 
   function getSideNavContainer() {
     return document.querySelector("bard-sidenav-container[data-test-id='bard-sidenav-container'], bard-sidenav-container");
@@ -121,6 +128,230 @@
     return target && target.closest
       ? target.closest("bard-sidenav button[data-test-id='mavatar-footer-settings-button'], bard-sidenav button[aria-label='Configurações']")
       : null;
+  }
+
+  function getPersonalIntelligenceMenuItem(target) {
+    return target && target.closest
+      ? target.closest("#" + SETTINGS_MENU_WRAPPER_ID + " a[href='/u/4/personalization-settings'], #" + SETTINGS_MENU_WRAPPER_ID + " a[href$='/personalization-settings']")
+      : null;
+  }
+
+  function getSavedInfoLink(target) {
+    return target && target.closest
+      ? target.closest("personal-intelligence-page a[href='/u/4/saved-info'], personal-intelligence-page a[href$='/saved-info'], personal-intelligence-page a[routerlink='/saved-info']")
+      : null;
+  }
+
+  function getSavedInfoAddButton(target) {
+    return target && target.closest
+      ? target.closest("saved-info-page button.create-memory-button")
+      : null;
+  }
+
+  function getEditMemoryDialogWrapper() {
+    return document.getElementById(EDIT_MEMORY_DIALOG_WRAPPER_ID);
+  }
+
+  function getEditMemoryDialogTemplate() {
+    return "<div class=\"cdk-overlay-container\"><div class=\"cdk-overlay-backdrop cdk-overlay-backdrop-noop-animation cdk-overlay-dark-backdrop cdk-overlay-backdrop-showing\"></div><div class=\"cdk-global-overlay-wrapper\" dir=\"ltr\" style=\"justify-content: center; align-items: center;\"><div id=\"cdk-overlay-5\" class=\"cdk-overlay-pane mat-mdc-dialog-panel\" style=\"width: calc(-48px + 100vw); max-width: 600px; position: static;\"><div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div><mat-dialog-container tabindex=\"-1\" class=\"mat-mdc-dialog-container mdc-dialog cdk-dialog-container mdc-dialog--open _mat-animation-noopable mat-mdc-dialog-container-with-actions\" id=\"mat-mdc-dialog-0\" role=\"dialog\" aria-modal=\"false\" aria-labelledby=\"mat-mdc-dialog-title-0\"><div class=\"mat-mdc-dialog-inner-container mdc-dialog__container\"><div class=\"mat-mdc-dialog-surface mdc-dialog__surface\"><edit-memory-dialog _nghost-ng-c4208921684=\"\" class=\"mat-mdc-dialog-component-host ng-star-inserted\"><h1 _ngcontent-ng-c4208921684=\"\" mat-dialog-title=\"\" class=\"mat-mdc-dialog-title mdc-dialog__title gds-title-l\" id=\"mat-mdc-dialog-title-0\">O que você quer que o Gemini memorize?</h1><mat-dialog-content _ngcontent-ng-c4208921684=\"\" class=\"mat-mdc-dialog-content mdc-dialog__content\"><mat-form-field _ngcontent-ng-c4208921684=\"\" appearance=\"outline\" subscriptsizing=\"dynamic\" class=\"mat-mdc-form-field edit-memory-form-field mat-mdc-form-field-type-mat-input mat-form-field-appearance-outline mat-primary ng-valid ng-touched\"><!----><div class=\"mat-mdc-text-field-wrapper mdc-text-field mdc-text-field--outlined mdc-text-field--no-label\"><!----><div class=\"mat-mdc-form-field-flex\"><div matformfieldnotchedoutline=\"\" class=\"mdc-notched-outline mdc-notched-outline--no-label ng-star-inserted\"><div class=\"mat-mdc-notch-piece mdc-notched-outline__leading\"></div><div class=\"mat-mdc-notch-piece mdc-notched-outline__notch\"><!----><!----><!----></div><div class=\"mat-mdc-notch-piece mdc-notched-outline__trailing\"></div></div><!----><!----><!----><div class=\"mat-mdc-form-field-infix\"><!----><textarea _ngcontent-ng-c4208921684=\"\" rows=\"1\" matinput=\"\" cdktextareaautosize=\"\" aria-label=\"Inserir nova memória\" placeholder=\"Por exemplo: &quot;Prefiro respostas curtas e concisas&quot;\" class=\"cdk-textarea-autosize mat-mdc-input-element edit-memory-input mat-mdc-form-field-textarea-control mat-mdc-form-field-input-control mdc-text-field__input ng-pristine ng-valid cdk-text-field-autofill-monitored ng-touched\" id=\"mat-input-0\" aria-invalid=\"false\" aria-required=\"false\" maxlength=\"10000\" style=\"height: 24px;\">    </textarea></div><!----><!----></div><!----></div><div aria-atomic=\"true\" aria-live=\"polite\" class=\"mat-mdc-form-field-subscript-wrapper mat-mdc-form-field-bottom-align mat-mdc-form-field-subscript-dynamic-size\"><!----><div class=\"mat-mdc-form-field-hint-wrapper ng-star-inserted\"><!----><div class=\"mat-mdc-form-field-hint-spacer\"></div></div><!----></div></mat-form-field></mat-dialog-content><mat-dialog-actions _ngcontent-ng-c4208921684=\"\" align=\"end\" class=\"mat-mdc-dialog-actions mdc-dialog__actions mat-mdc-dialog-actions-align-end\"><button _ngcontent-ng-c4208921684=\"\" mat-button=\"\" mat-dialog-close=\"\" color=\"primary\" class=\"mdc-button mat-mdc-button-base mat-mdc-button mat-primary _mat-animation-noopable\" mat-ripple-loader-uninitialized=\"\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" type=\"button\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\">Cancelar</span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span></button><button _ngcontent-ng-c4208921684=\"\" mat-flat-button=\"\" data-test-id=\"submit-button\" color=\"primary\" class=\"mdc-button mat-mdc-button-base edit-memory-submit-button mdc-button--unelevated mat-mdc-unelevated-button mat-primary mat-mdc-button-disabled _mat-animation-noopable\" mat-ripple-loader-uninitialized=\"\" mat-ripple-loader-class-name=\"mat-mdc-button-ripple\" mat-ripple-loader-disabled=\"\" disabled=\"true\"><span class=\"mat-mdc-button-persistent-ripple mdc-button__ripple\"></span><span class=\"mdc-button__label\"><span _ngcontent-ng-c4208921684=\"\" class=\"ng-star-inserted\">Enviar</span><!----><!----></span><!----><span class=\"mat-focus-indicator\"></span><span class=\"mat-mdc-button-touch-target\"></span></button></mat-dialog-actions></edit-memory-dialog><!----></div></div></mat-dialog-container><div tabindex=\"0\" class=\"cdk-visually-hidden cdk-focus-trap-anchor\" aria-hidden=\"true\"></div></div></div></div>";
+  }
+
+  function ensureEditMemoryDialogStyle() {
+    var style;
+
+    if (document.getElementById(EDIT_MEMORY_DIALOG_STYLE_ID)) {
+      return;
+    }
+
+    style = document.createElement("style");
+    style.id = EDIT_MEMORY_DIALOG_STYLE_ID;
+    style.textContent = [
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " {",
+      "  position: fixed;",
+      "  inset: 0;",
+      "  z-index: 1400;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-container {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .cdk-global-overlay-wrapper {",
+      "  position: absolute;",
+      "  inset: 0;",
+      "  display: flex;",
+      "}",
+      "#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " textarea.edit-memory-input {",
+      "  resize: none;",
+      "}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function ensureEditMemoryDialogExtractedStyles() {
+    var headTemplate = window.GEMINI_EDIT_MEMORY_DIALOG_HEAD_TEMPLATE || "";
+    var template = document.createElement("template");
+    var marker;
+
+    if (!headTemplate || document.getElementById(EDIT_MEMORY_DIALOG_EXTRACTED_STYLES_ID)) {
+      return;
+    }
+
+    marker = document.createElement("meta");
+    marker.id = EDIT_MEMORY_DIALOG_EXTRACTED_STYLES_ID;
+    document.head.appendChild(marker);
+
+    template.innerHTML = headTemplate;
+    Array.prototype.slice.call(template.content.children).forEach(function (node) {
+      node.setAttribute("data-gemini-edit-memory-dialog-style", "");
+      document.head.appendChild(node);
+    });
+  }
+
+  function closeEditMemoryDialog() {
+    var wrapper = getEditMemoryDialogWrapper();
+
+    if (wrapper) {
+      wrapper.remove();
+    }
+  }
+
+  function openEditMemoryDialog() {
+    var wrapper = getEditMemoryDialogWrapper();
+    var textarea;
+
+    ensureEditMemoryDialogExtractedStyles();
+    ensureEditMemoryDialogStyle();
+
+    if (wrapper) {
+      wrapper.remove();
+    }
+
+    wrapper = document.createElement("div");
+    wrapper.id = EDIT_MEMORY_DIALOG_WRAPPER_ID;
+    wrapper.innerHTML = getEditMemoryDialogTemplate();
+    document.body.appendChild(wrapper);
+
+    textarea = wrapper.querySelector("textarea.edit-memory-input");
+    if (textarea) {
+      textarea.value = "";
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }
+  }
+
+  function getPersonalMemoryToggleButton(target) {
+    return target && target.closest
+      ? target.closest("personal-intelligence-page mat-slide-toggle[data-test-id='enable-personal-gemini-context-toggle'] button[role='switch']")
+      : null;
+  }
+
+  function togglePersonalMemory(button) {
+    var slideToggle = button ? button.closest("mat-slide-toggle[data-test-id='enable-personal-gemini-context-toggle']") : null;
+    var checked = button ? button.getAttribute("aria-checked") === "true" : false;
+    var nextChecked = !checked;
+
+    if (!button || !slideToggle) {
+      return;
+    }
+
+    slideToggle.classList.toggle("mat-mdc-slide-toggle-checked", nextChecked);
+    button.classList.toggle("mdc-switch--selected", nextChecked);
+    button.classList.toggle("mdc-switch--checked", nextChecked);
+    button.classList.toggle("mdc-switch--unselected", !nextChecked);
+    button.setAttribute("aria-checked", nextChecked ? "true" : "false");
+  }
+
+  function ensurePersonalIntelligenceStyles() {
+    var headTemplate = window.GEMINI_PERSONAL_INTELLIGENCE_HEAD_TEMPLATE || "";
+    var template = document.createElement("template");
+    var marker;
+
+    if (!headTemplate || document.getElementById(PERSONAL_INTELLIGENCE_STYLES_ID)) {
+      return;
+    }
+
+    marker = document.createElement("meta");
+    marker.id = PERSONAL_INTELLIGENCE_STYLES_ID;
+    document.head.appendChild(marker);
+
+    template.innerHTML = headTemplate;
+    Array.prototype.slice.call(template.content.children).forEach(function (node) {
+      node.setAttribute("data-gemini-personal-intelligence-style", "");
+      document.head.appendChild(node);
+    });
+  }
+
+  function ensureSavedInfoStyles() {
+    var headTemplate = window.GEMINI_SAVED_INFO_HEAD_TEMPLATE || "";
+    var template = document.createElement("template");
+    var marker;
+
+    if (!headTemplate || document.getElementById(SAVED_INFO_STYLES_ID)) {
+      return;
+    }
+
+    marker = document.createElement("meta");
+    marker.id = SAVED_INFO_STYLES_ID;
+    document.head.appendChild(marker);
+
+    template.innerHTML = headTemplate;
+    Array.prototype.slice.call(template.content.children).forEach(function (node) {
+      node.setAttribute("data-gemini-saved-info-style", "");
+      document.head.appendChild(node);
+    });
+  }
+
+  function ensurePersonalIntelligenceTopControlsStyle() {
+    var style;
+
+    if (document.getElementById(PERSONAL_INTELLIGENCE_TOP_CONTROLS_STYLE_ID)) {
+      return;
+    }
+
+    style = document.createElement("style");
+    style.id = PERSONAL_INTELLIGENCE_TOP_CONTROLS_STYLE_ID;
+    style.textContent = [
+      "body." + PERSONAL_INTELLIGENCE_ACTIVE_CLASS + " top-bar-actions .buttons-container.adv-upsell,",
+      "body." + PERSONAL_INTELLIGENCE_ACTIVE_CLASS + " top-bar-actions [data-test-id='g1-dynamic-advanced-upsell-button'],",
+      "body." + PERSONAL_INTELLIGENCE_ACTIVE_CLASS + " top-bar-actions [data-test-id='temp-chat-button-container'],",
+      "body." + PERSONAL_INTELLIGENCE_ACTIVE_CLASS + " top-bar-actions [data-test-id='temp-chat-button'] {",
+      "  display: none !important;",
+      "}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  function renderPersonalIntelligencePage() {
+    var content = document.querySelector("bard-sidenav-content");
+    var template = window.GEMINI_PERSONAL_INTELLIGENCE_TEMPLATE || "";
+
+    if (!content || !template) {
+      return;
+    }
+
+    ensurePersonalIntelligenceStyles();
+    ensurePersonalIntelligenceTopControlsStyle();
+    document.body.classList.add(PERSONAL_INTELLIGENCE_ACTIVE_CLASS);
+    content.outerHTML = template;
+    closeSettingsMenu();
+  }
+
+  function renderSavedInfoPage() {
+    var content = document.querySelector("bard-sidenav-content");
+    var template = window.GEMINI_SAVED_INFO_TEMPLATE || "";
+
+    if (!content || !template) {
+      return;
+    }
+
+    ensureSavedInfoStyles();
+    ensurePersonalIntelligenceTopControlsStyle();
+    document.body.classList.add(PERSONAL_INTELLIGENCE_ACTIVE_CLASS);
+    content.outerHTML = template;
   }
 
   function getThemeMenuButton(target) {
@@ -342,12 +573,25 @@
 
   function replaceSideNav(markup) {
     var container = getSideNavContainer();
+    var currentContent = container ? container.querySelector("bard-sidenav-content") : null;
+    var template;
+    var nextContainer;
+    var nextContent;
 
     if (!container || !markup) {
       return false;
     }
 
-    container.outerHTML = markup;
+    template = document.createElement("template");
+    template.innerHTML = markup.trim();
+    nextContainer = template.content.querySelector("bard-sidenav-container");
+    nextContent = nextContainer ? nextContainer.querySelector("bard-sidenav-content") : null;
+
+    if (currentContent && nextContent) {
+      nextContent.outerHTML = currentContent.outerHTML;
+    }
+
+    container.outerHTML = nextContainer ? nextContainer.outerHTML : markup;
     return true;
   }
 
@@ -509,12 +753,51 @@
   document.addEventListener("click", function (event) {
     var settingsButton = getSettingsButton(event.target);
     var settingsWrapper = getSettingsMenuWrapper();
+    var personalIntelligenceItem = getPersonalIntelligenceMenuItem(event.target);
+    var savedInfoLink = getSavedInfoLink(event.target);
+    var savedInfoAddButton = getSavedInfoAddButton(event.target);
+    var personalMemoryToggle = getPersonalMemoryToggleButton(event.target);
     var expandableToggle = getExpandableSectionToggle(event.target);
 
     if (settingsButton) {
       event.preventDefault();
       event.stopPropagation();
       toggleSettingsMenu(settingsButton);
+      return;
+    }
+
+    if (personalIntelligenceItem) {
+      event.preventDefault();
+      event.stopPropagation();
+      renderPersonalIntelligencePage();
+      return;
+    }
+
+    if (savedInfoLink) {
+      event.preventDefault();
+      event.stopPropagation();
+      renderSavedInfoPage();
+      return;
+    }
+
+    if (savedInfoAddButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openEditMemoryDialog();
+      return;
+    }
+
+    if (event.target.closest && event.target.closest("#" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " .cdk-overlay-backdrop, #" + EDIT_MEMORY_DIALOG_WRAPPER_ID + " button[mat-dialog-close]")) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeEditMemoryDialog();
+      return;
+    }
+
+    if (personalMemoryToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      togglePersonalMemory(personalMemoryToggle);
       return;
     }
 
@@ -554,6 +837,12 @@
   }, true);
 
   document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && getEditMemoryDialogWrapper()) {
+      event.preventDefault();
+      closeEditMemoryDialog();
+      return;
+    }
+
     if (event.key === "Escape" && getSettingsMenuWrapper()) {
       event.preventDefault();
       closeSettingsMenu();
